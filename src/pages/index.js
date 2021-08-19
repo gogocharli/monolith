@@ -34,6 +34,7 @@ function Composition(props) {
         width: window.innerWidth,
         height: window.innerHeight,
         wireframes: false,
+        background: '#111',
       },
     });
 
@@ -124,22 +125,22 @@ function Composition(props) {
             body = Bodies.rectangle(
               x,
               y,
-              Common.random(25, 50),
-              Common.random(25, 50),
+              Common.random(10, 15),
+              Common.random(10, 15),
               { chamfer: chamfer },
             );
           } else {
             body = Bodies.rectangle(
               x,
               y,
-              Common.random(80, 120),
-              Common.random(25, 30),
+              Common.random(20, 60),
+              Common.random(10, 20),
               { chamfer: chamfer, restitution: 1.05 },
             );
           }
           break;
         case 1:
-          body = Bodies.polygon(x, y, sides, Common.random(25, 50), {
+          body = Bodies.polygon(x, y, sides, Common.random(10, 15), {
             chamfer: chamfer,
             restitution: 0.95,
           });
@@ -162,6 +163,7 @@ function Composition(props) {
         height: '100vh',
         placeContent: 'center',
         position: 'relative',
+        width: '100vw',
       }}
     >
       <Button
