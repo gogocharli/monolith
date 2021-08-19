@@ -1,25 +1,23 @@
 /** @jsxImportSource theme-ui */
-import React, { useRef, useEffect } from 'react';
-import {
-  Engine,
-  Render,
-  Runner,
-  Composites,
-  Common,
-  MouseConstraint,
-  Mouse,
-  Composite,
-  Bodies,
-  Body,
-  World,
-  Events,
-} from 'matter-js';
+import React, { useRef, useEffect, useState } from 'react';
+import { Engine, Render, Runner, Common, Bodies, Body, World } from 'matter-js';
+import { Button } from '@theme-ui/components';
 import '../styles/base.css';
 
-// markup
+const STATIC_DENSITY = 20;
+
 function Composition(props) {
-  const engine = useRef(Engine.create());
+  const engine = useRef(Engine.create({ gravity: 0.5 }));
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
+
+  const [constraints, setConstraints] = useState(null);
+  const [scene, setScene] = useState(null);
+  const [particles, setParticles] = useState(0);
+
+  const handleResize = () => {
+    setConstraints(containerRef.current.getBoundingClientRect());
+  };
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -28,6 +26,7 @@ function Composition(props) {
     const world = currentEngine.world;
 
     const render = Render.create({
+      element: containerRef.current,
       canvas: canvasRef.current,
       engine: currentEngine,
       options: {
@@ -45,7 +44,67 @@ function Composition(props) {
     const runner = Runner.create();
     Runner.run(runner, currentEngine);
 
-    const stack = Composites.stack(20, 20, 10, 5, 0, 0, function (x, y) {
+    const floor = Bodies.rectangle(0, 0, 0, STATIC_DENSITY, {
+      isStatic: true,
+    });
+    World.add(world, floor);
+
+    setConstraints(containerRef.current.getBoundingClientRect());
+    setScene(render);
+
+    return () => {
+      Render.stop(render);
+      Runner.stop(runner);
+      World.clear(world);
+      Engine.clear(currentEngine);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  });
+
+  useEffect(() => {
+    if (constraints) {
+      const { width, height } = constraints;
+
+      // Dynamically update canvas and bounds
+      scene.bounds.max.x = width;
+      scene.bounds.max.y = height;
+      scene.options.width = width;
+      scene.options.height = height;
+      scene.canvas.width = width;
+      scene.canvas.height = height;
+
+      // Dynamically update floor
+      const floor = engine.current.world.bodies[0];
+
+      if (floor) {
+        Body.setPosition(floor, {
+          x: width / 2,
+          y: height + STATIC_DENSITY / 2,
+        });
+
+        Body.setVertices(floor, [
+          { x: 0, y: height },
+          { x: width, y: height },
+          { x: width, y: height + STATIC_DENSITY },
+          { x: 0, y: height + STATIC_DENSITY },
+        ]);
+      }
+    }
+  }, [scene, constraints]);
+
+  useEffect(() => {
+    if (scene) {
+      const { width } = constraints;
+
+      let x = Common.random(0, width);
+      let y = 0; // Always fall from the top
+
       let sides = Math.round(Common.random(1, 8));
 
       // triangles can be a little unstable, so avoid until fixed
@@ -59,10 +118,12 @@ function Composition(props) {
         };
       }
 
+      // Randomize shape
+      let body = null;
       switch (Math.round(Common.random(0, 1))) {
         case 0:
           if (Common.random() < 0.8) {
-            return Bodies.rectangle(
+            body = Bodies.rectangle(
               x,
               y,
               Common.random(25, 50),
@@ -70,7 +131,7 @@ function Composition(props) {
               { chamfer: chamfer },
             );
           } else {
-            return Bodies.rectangle(
+            body = Bodies.rectangle(
               x,
               y,
               Common.random(80, 120),
@@ -78,100 +139,54 @@ function Composition(props) {
               { chamfer: chamfer },
             );
           }
+          break;
         case 1:
-          return Bodies.polygon(x, y, sides, Common.random(25, 50), {
+          body = Bodies.polygon(x, y, sides, Common.random(25, 50), {
             chamfer: chamfer,
           });
+          break;
         default:
           break;
       }
-    });
 
-    Composite.add(world, stack);
-
-    // Walls
-    const wallThickness = 50;
-    const topWall = Bodies.rectangle(
-      window.innerWidth / 2,
-      -wallThickness / 2,
-      window.innerWidth,
-      wallThickness,
-      { isStatic: true },
-    );
-
-    const bottomWall = Bodies.rectangle(
-      window.innerWidth / 2,
-      window.innerHeight + wallThickness / 2,
-      window.innerWidth,
-      wallThickness,
-      { isStatic: true },
-    );
-
-    const rightWall = Bodies.rectangle(
-      window.innerWidth + wallThickness / 2,
-      window.innerHeight / 2,
-      wallThickness,
-      window.innerHeight,
-      { isStatic: true },
-    );
-
-    const leftWall = Bodies.rectangle(
-      -wallThickness / 2,
-      window.innerHeight / 2,
-      wallThickness,
-      window.innerHeight,
-      { isStatic: true },
-    );
-
-    Composite.add(world, [topWall, bottomWall, rightWall, leftWall]);
-
-    let prevWidth = window.innerWidth;
-    let prevHeight = window.innerHeight;
-    const handleResize = (event) => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-
-      render.canvas.height = h;
-      render.canvas.width = w;
-
-      // Resize walls
-      Body.setPosition(topWall, { x: w / 2, y: -wallThickness / 2 });
-      Body.scale(topWall, w / prevWidth, 1);
-
-      Body.setPosition(bottomWall, {
-        x: w / 2,
-        y: h + wallThickness / 2,
-      });
-      Body.scale(bottomWall, w / prevWidth, 1);
-
-      Body.setPosition(leftWall, { x: -wallThickness / 2, y: h / 2 });
-      Body.scale(leftWall, 1, h / prevHeight);
-
-      Body.setPosition(rightWall, {
-        x: w + wallThickness / 2,
-        y: h / 2,
-      });
-      Body.scale(rightWall, 1, h / prevHeight);
-
-      // Reset widht and height
-      prevWidth = w;
-      prevHeight = h;
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      Render.stop(render);
-      Runner.stop(runner);
-      World.clear(world);
-      Engine.clear(currentEngine);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+      World.add(engine.current.world, body);
+    }
+    /** Slight issue with dependecy list but it would require a more complex solution */
+  }, [particles]);
 
   return (
-    <main sx={{ width: '100vw', height: '100vh' }}>
-      <canvas ref={canvasRef}></canvas>
+    <main
+      sx={{
+        backgroundColor: '#fff',
+        color: '#111',
+        display: 'grid',
+        height: '100vh',
+        placeContent: 'center',
+        position: 'relative',
+      }}
+    >
+      <Button
+        sx={{
+          backgroundColor: '#fff',
+          color: '#111',
+          zIndex: 1,
+        }}
+        onClick={() => setParticles((prevCount) => prevCount + 1)}
+      >
+        Make it Rain
+      </Button>
+      <div
+        ref={containerRef}
+        sx={{
+          height: '100%',
+          left: 0,
+          position: 'absolute',
+          top: 0,
+          width: '100%',
+        }}
+      >
+        <canvas ref={canvasRef}></canvas>
+      </div>
     </main>
   );
 }
