@@ -7,7 +7,7 @@ import '../styles/base.css';
 const STATIC_DENSITY = 20;
 
 function Composition(props) {
-  const engine = useRef(Engine.create({ gravity: 0.5 }));
+  const engine = useRef(Engine.create());
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -33,9 +33,7 @@ function Composition(props) {
         pixelRatio: Math.min(window.devicePixelRatio, 2),
         width: window.innerWidth,
         height: window.innerHeight,
-        wireframes: true,
-        showAngleIndicator: true,
-        wireframeBackground: '#111',
+        wireframes: false,
       },
     });
 
@@ -65,7 +63,7 @@ function Composition(props) {
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  });
+  }, []);
 
   useEffect(() => {
     if (constraints) {
@@ -136,13 +134,14 @@ function Composition(props) {
               y,
               Common.random(80, 120),
               Common.random(25, 30),
-              { chamfer: chamfer },
+              { chamfer: chamfer, restitution: 1.05 },
             );
           }
           break;
         case 1:
           body = Bodies.polygon(x, y, sides, Common.random(25, 50), {
             chamfer: chamfer,
+            restitution: 0.95,
           });
           break;
         default:
